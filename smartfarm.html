@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartAgri 60ha - Biosecurity Standard Master Layout</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js & OrbitControls CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #020617; font-family: ui-sans-serif, system-ui, sans-serif; }
+        canvas { display: block; }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+    <!-- UI Overlay -->
+    <div class="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4">
+        
+        <!-- Top Bar: Tombol Hamburger & Quick Camera Fly-To -->
+        <div class="flex justify-between items-start pointer-events-auto">
+            <button onclick="toggleSidebar()" class="bg-slate-900/90 hover:bg-slate-800 backdrop-blur p-3.5 rounded-2xl border border-slate-700 shadow-2xl transition flex items-center justify-center text-white focus:outline-none group" title="Buka Menu">
+                <svg class="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+
+            <!-- Tombol Cepat Fokus Kamera Sesuai Standar Zonasi -->
+            <div class="bg-slate-900/85 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700/80 shadow-xl flex flex-wrap gap-1.5 text-[11px]">
+                <button onclick="flyTo(100, 520, 680, 100, 0, 0)" class="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 transition font-semibold">Overview 60ha</button>
+                <button onclick="flyTo(-270, 130, -80, -270, 0, -255)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">1. Lahan & Waduk</button>
+                <button onclick="flyTo(-260, 130, 480, -260, 0, 260)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">2. Kantor, Mes & PLTS</button>
+                <button onclick="flyTo(120, 130, 480, 120, 0, 240)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">3. Barn & Gudang</button>
+                <button onclick="flyTo(335, 130, -100, 335, 0, -260)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">4. Kandang & Maggot</button>
+                <button onclick="flyTo(760, 140, -260, 600, 0, -260)" class="px-2.5 py-1 rounded-lg bg-red-900/80 hover:bg-red-700 transition">5. Zona Limbah (Terisolasi)</button>
+                <button onclick="flyTo(360, 110, 560, 360, 0, 365)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">6. Bengkel Alsintan</button>
+                <button onclick="flyTo(0, 80, 730, 0, 0, 585)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">Main Gate</button>
+            </div>
+        </div>
+
+        <!-- Collapsible Sidebar / Drawer -->
+        <div id="parameter-sidebar" class="pointer-events-auto absolute top-20 left-4 bg-slate-900/95 backdrop-blur p-5 rounded-2xl border border-slate-700 w-80 min-h-[200px] max-h-[85vh] overflow-y-auto shadow-2xl transition-all duration-300 transform -translate-x-[120%] opacity-0 z-20">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                <div>
+                    <h2 class="font-bold text-sm">Standar Zonasi 60ha</h2>
+                    <p class="text-[10px] text-slate-400">Clean – Biosecurity – Isolated Waste</p>
+                </div>
+                <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white text-sm font-bold px-2.5 py-1 rounded-lg bg-slate-800 transition">✕</button>
+            </div>
+            
+            <div id="hamburger-menu-content" class="text-xs text-slate-300 space-y-3">
+                <div>
+                    <p class="font-semibold text-emerald-400">A. Zona Bersih (Barat & Selatan):</p>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+                        <li>Kantor Pusat, IoT Tower & EV Charging</li>
+                        <li>Mes Pekerja & Kantin (Jauh dari kandang)</li>
+                        <li>PLTS & Power House BESS</li>
+                        <li>Lahan Tembakau & Water Reservoir Utama</li>
+                    </ul>
+                </div>
+                <div class="pt-2 border-t border-slate-800">
+                    <p class="font-semibold text-amber-400">B. Zona Produksi & Pascapanen (Tengah):</p>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+                        <li>Gudang Pupuk, Alsintan & Stasiun BBM</li>
+                        <li>Bangsal Panen, Sortasi, Barn & Grading</li>
+                        <li>Bengkel & Perawatan Alsintan</li>
+                    </ul>
+                </div>
+                <div class="pt-2 border-t border-slate-800">
+                    <p class="font-semibold text-sky-400">C. Zona Biosekuriti Ternak (Timur Tengah):</p>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+                        <li>Lab Lapangan & Pos Karantina Steril</li>
+                        <li>Kandang Ayam Petelur & Unit Maggot BSF</li>
+                    </ul>
+                </div>
+                <div class="pt-2 border-t border-slate-800">
+                    <p class="font-semibold text-rose-400">D. Zona Kotor / Limbah (Ujung Timur Laut):</p>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+                        <li>Terisolasi sabuk pohon (Green Buffer)</li>
+                        <li>Kolam IPAL, Rumah Kompos & TPS Limbah B3</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div></div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        let isSidebarOpen = false;
+        let targetCamPos = null;
+        let targetLookAt = null;
+
+        function flyTo(cx, cy, cz, tx, ty, tz) {
+            targetCamPos = new THREE.Vector3(cx, cy, cz);
+            targetLookAt = new THREE.Vector3(tx, ty, tz);
+        }
+
+        function toggleSidebar() {
+            isSidebarOpen = !isSidebarOpen;
+            const sidebar = document.getElementById('parameter-sidebar');
+            if (isSidebarOpen) {
+                sidebar.classList.remove('-translate-x-[120%]', 'opacity-0');
+                sidebar.classList.add('translate-x-0', 'opacity-100');
+            } else {
+                sidebar.classList.remove('translate-x-0', 'opacity-100');
+                sidebar.classList.add('-translate-x-[120%]', 'opacity-0');
+            }
+        }
+
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x38bdf8);
+        scene.fog = new THREE.FogExp2(0x38bdf8, 0.00035);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 5000);
+        camera.position.set(100, 520, 680);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.maxPolarAngle = Math.PI / 2 - 0.04;
+        controls.minDistance = 40;
+        controls.maxDistance = 1500;
+        controls.enableDamping = true;
+        controls.target.set(100, 0, 0);
+
+        controls.addEventListener('start', () => {
+            targetCamPos = null;
+            targetLookAt = null;
+        });
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.25);
+        dirLight.position.set(450, 650, 300);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 50;
+        dirLight.shadow.camera.far = 2200;
+        const d = 850;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        // =========================================================================
+        // GROUND MASTER FULL 1200 x 1200 (x: -500 s/d +700, z: -600 s/d +600)
+        // =========================================================================
+        const groundGeo = new THREE.PlaneGeometry(1200, 1200);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x3f6212, roughness: 0.95 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(100, 0, 0);
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const gridHelper = new THREE.GridHelper(1200, 60, 0x1a2e05, 0x365314);
+        gridHelper.position.set(100, 0.15, 0);
+        scene.add(gridHelper);
+
+        // --- HELPER: LABEL NAMA GEDUNG / ZONA 3D ---
+        function createBuildingLabel(text, x, y, z, bgColor = 'rgba(15, 23, 42, 0.88)', borderColor = '#38bdf8') {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 110;
+
+            ctx.fillStyle = bgColor;
+            ctx.beginPath();
+            ctx.roundRect(12, 12, canvas.width - 24, canvas.height - 24, 24);
+            ctx.fill();
+
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = borderColor;
+            ctx.stroke();
+
+            ctx.font = 'bold 28px sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.position.set(x, y, z);
+            sprite.scale.set(68, 15, 1);
+            sprite.renderOrder = 999;
+            scene.add(sprite);
+            return sprite;
+        }
+
+        // --- HELPER: MEMBUAT GEDUNG ---
+        function createPitchedBuilding(w, h, d, wallColor, roofColor, hasChimney = false, hasGarageDoor = false) {
+            const group = new THREE.Group();
+
+            const base = new THREE.Mesh(
+                new THREE.BoxGeometry(w + 2, 1.2, d + 2),
+                new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+            );
+            base.position.y = 0.6;
+            base.receiveShadow = true;
+            group.add(base);
+
+            const wall = new THREE.Mesh(
+                new THREE.BoxGeometry(w, h, d),
+                new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7 })
+            );
+            wall.position.y = 1.2 + h / 2;
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            group.add(wall);
+
+            const roofHeight = h * 0.45;
+            const roofOverhang = 2.5;
+            const roofShape = new THREE.Shape();
+            roofShape.moveTo(-(w / 2 + roofOverhang), 0);
+            roofShape.lineTo(0, roofHeight);
+            roofShape.lineTo(w / 2 + roofOverhang, 0);
+            roofShape.closePath();
+
+            const extrudeSettings = { depth: d + roofOverhang * 2, bevelEnabled: false };
+            const roofGeo = new THREE.ExtrudeGeometry(roofShape, extrudeSettings);
+            roofGeo.translate(0, 0, -(d / 2 + roofOverhang));
+            const roofMesh = new THREE.Mesh(
+                roofGeo,
+                new THREE.MeshStandardMaterial({ color: roofColor, roughness: 0.6 })
+            );
+            roofMesh.position.y = 1.2 + h;
+            roofMesh.castShadow = true;
+            group.add(roofMesh);
+
+            const winMat = new THREE.MeshStandardMaterial({ color: 0xbae6fd, roughness: 0.2 });
+            const winGeo = new THREE.BoxGeometry(3.5, 3, 0.5);
+            const winCount = Math.floor(w / 14);
+            for (let i = 0; i < winCount; i++) {
+                const wx = -w / 2 + 8 + i * 13;
+                const winFront = new THREE.Mesh(winGeo, winMat);
+                winFront.position.set(wx, 1.2 + h * 0.55, d / 2 + 0.1);
+                group.add(winFront);
+
+                const winBack = new THREE.Mesh(winGeo, winMat);
+                winBack.position.set(wx, 1.2 + h * 0.55, -d / 2 - 0.1);
+                group.add(winBack);
+            }
+
+            if (hasGarageDoor) {
+                const door = new THREE.Mesh(
+                    new THREE.BoxGeometry(w * 0.45, h * 0.72, 0.8),
+                    new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5, roughness: 0.4 })
+                );
+                door.position.set(0, 1.2 + (h * 0.72) / 2, d / 2 + 0.2);
+                group.add(door);
+            }
+
+            if (hasChimney) {
+                for (let c = -1; c <= 1; c += 2) {
+                    const vent = new THREE.Mesh(
+                        new THREE.BoxGeometry(4, 5, 4),
+                        new THREE.MeshStandardMaterial({ color: 0x475569 })
+                    );
+                    vent.position.set(c * (w * 0.22), 1.2 + h + roofHeight * 0.75, 0);
+                    vent.castShadow = true;
+                    group.add(vent);
+                }
+            }
+
+            return group;
+        }
+
+        // --- HELPER: MEMBUAT POHON SABUK HIJAU (GREEN BUFFER) ---
+        const trunkGeo = new THREE.CylinderGeometry(1.4, 1.8, 9, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
+        const crownGeo = new THREE.DodecahedronGeometry(7.5, 1);
+        const crownMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
+
+        function plantTree(x, z) {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 4.5;
+            const crown = new THREE.Mesh(crownGeo, crownMat);
+            crown.position.y = 11;
+            crown.castShadow = true;
+            tree.add(trunk, crown);
+            tree.position.set(x, 0, z);
+            scene.add(tree);
+        }
+
+        // =========================================================================
+        // 1. ZONA BERSIH UTARA-BARAT: SAWAH TEMBAKAU & WATER RESERVOIR UTAMA
+        //    (x: -480 s/d -20, z: -570 s/d -30 -> Diperpanjang ke utara)
+        // =========================================================================
+        const tobaccoGroup = new THREE.Group();
+        tobaccoGroup.position.set(-315, 0, -300);
+        scene.add(tobaccoGroup);
+
+        const fieldBase = new THREE.Mesh(
+            new THREE.BoxGeometry(330, 0.6, 530),
+            new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 1 })
+        );
+        fieldBase.position.y = 0.3;
+        fieldBase.receiveShadow = true;
+        tobaccoGroup.add(fieldBase);
+
+        const bedCount = 16;
+        const bedGeo = new THREE.BoxGeometry(12, 1.4, 510);
+        const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c2b0c, roughness: 0.95 });
+        const pipeGeo = new THREE.CylinderGeometry(0.35, 0.35, 510, 6);
+        pipeGeo.rotateX(Math.PI / 2);
+        const pipeMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4 });
+
+        const bedPositionsX = [];
+        for (let i = 0; i < bedCount; i++) {
+            const bx = -145 + i * 19.3;
+            bedPositionsX.push(bx);
+
+            const bed = new THREE.Mesh(bedGeo, bedMat);
+            bed.position.set(bx, 1.0, 0);
+            bed.receiveShadow = true;
+            tobaccoGroup.add(bed);
+
+            const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+            pipe.position.set(bx, 1.8, 0);
+            tobaccoGroup.add(pipe);
+        }
+
+        const plantGeo = new THREE.ConeGeometry(2.9, 5.2, 6);
+        plantGeo.translate(0, 2.6, 0);
+        const plantMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.65 });
+
+        const rowsPerBed = 64;
+        const maxPlants = bedPositionsX.length * rowsPerBed * 2;
+        const tobaccoPlantsInstanced = new THREE.InstancedMesh(plantGeo, plantMat, maxPlants);
+        tobaccoPlantsInstanced.castShadow = true;
+        tobaccoPlantsInstanced.receiveShadow = true;
+        tobaccoGroup.add(tobaccoPlantsInstanced);
+
+        const dummy = new THREE.Object3D();
+        let idx = 0;
+        for (let b = 0; b < bedPositionsX.length; b++) {
+            const bx = bedPositionsX[b];
+            for (let r = 0; r < rowsPerBed; r++) {
+                const pz = -246 + r * 7.8;
+                for (let side = -1; side <= 1; side += 2) {
+                    dummy.position.set(bx + side * 2.8, 1.6, pz);
+                    const scale = 0.88 + ((b * 7 + r * 3) % 5) * 0.08;
+                    dummy.scale.set(scale, scale, scale);
+                    dummy.rotation.y = (b + r) * 0.7;
+                    dummy.updateMatrix();
+                    tobaccoPlantsInstanced.setMatrixAt(idx++, dummy.matrix);
+                }
+            }
+        }
+        tobaccoPlantsInstanced.instanceMatrix.needsUpdate = true;
+        createBuildingLabel('LAHAN TEMBAKAU (ZONA BERSIH)', -315, 28, -300, 'rgba(20, 83, 45, 0.9)', '#4ade80');
+
+        // WATER RESERVOIR & STASIUN POMPA UTAMA (Diperpanjang ke utara)
+        const waterBase = new THREE.Mesh(
+            new THREE.BoxGeometry(110, 0.8, 530),
+            new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 })
+        );
+        waterBase.position.set(-80, 0.4, -300);
+        waterBase.receiveShadow = true;
+        scene.add(waterBase);
+
+        const reservoirFrame = new THREE.Mesh(
+            new THREE.BoxGeometry(85, 2.5, 340),
+            new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+        );
+        reservoirFrame.position.set(-80, 1.6, -370);
+        reservoirFrame.receiveShadow = true;
+        scene.add(reservoirFrame);
+
+        const reservoirWater = new THREE.Mesh(
+            new THREE.BoxGeometry(77, 2.7, 332),
+            new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.15, metalness: 0.2 })
+        );
+        reservoirWater.position.set(-80, 1.6, -370);
+        scene.add(reservoirWater);
+
+        const pumpHouse = createPitchedBuilding(70, 12, 55, 0xf8fafc, 0x0284c7, false, true);
+        pumpHouse.position.set(-80, 0.8, -145);
+        scene.add(pumpHouse);
+
+        const waterTower = new THREE.Mesh(
+            new THREE.CylinderGeometry(13, 13, 28, 20),
+            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.3, roughness: 0.3 })
+        );
+        waterTower.position.set(-80, 14.8, -80);
+        waterTower.castShadow = true;
+        scene.add(waterTower);
+        createBuildingLabel('WADUK & POMPA AIR BERSIH', -80, 32, -260, 'rgba(12, 74, 110, 0.95)', '#38bdf8');
+
+        // =========================================================================
+        // 2. ZONA BERSIH SELATAN-BARAT: PLTS, KANTOR PUSAT, IOT & HUNIAN PEKERJA
+        //    (Diperpanjang ke selatan hingga z: +570)
+        // =========================================================================
+        
+        // 2A. PLTS & Power House BESS (x: -380, z: 300)
+        const solarBase = new THREE.Mesh(
+            new THREE.BoxGeometry(200, 0.8, 530),
+            new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.95 })
+        );
+        solarBase.position.set(-380, 0.4, 300);
+        solarBase.receiveShadow = true;
+        scene.add(solarBase);
+
+        const pltsControlBuilding = createPitchedBuilding(110, 13, 55, 0xf1f5f9, 0x1e40af, false, true);
+        pltsControlBuilding.position.set(-400, 0.8, 82);
+        scene.add(pltsControlBuilding);
+
+        const bessUnit = new THREE.Mesh(
+            new THREE.BoxGeometry(40, 11, 50),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.6, roughness: 0.3 })
+        );
+        bessUnit.position.set(-315, 6.3, 82);
+        bessUnit.castShadow = true;
+        scene.add(bessUnit);
+        createBuildingLabel('POWER HOUSE & BESS PLTS', -380, 26, 82, 'rgba(30, 58, 138, 0.95)', '#60a5fa');
+
+        const pvGeo = new THREE.BoxGeometry(20, 0.8, 12);
+        pvGeo.rotateX(THREE.MathUtils.degToRad(15));
+        const pvMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, metalness: 0.75, roughness: 0.2 });
+
+        const pvCols = 6;
+        const pvRows = 20;
+        const solarPanelsMesh = new THREE.InstancedMesh(pvGeo, pvMat, pvCols * pvRows);
+        solarPanelsMesh.castShadow = true;
+        solarPanelsMesh.position.set(-380, 4.5, 340);
+        scene.add(solarPanelsMesh);
+
+        const pvDummy = new THREE.Object3D();
+        let pvIdx = 0;
+        for (let c = 0; c < pvCols; c++) {
+            for (let r = 0; r < pvRows; r++) {
+                pvDummy.position.set(-70 + c * 28, 0, -195 + r * 20.5);
+                pvDummy.updateMatrix();
+                solarPanelsMesh.setMatrixAt(pvIdx++, pvDummy.matrix);
+            }
+        }
+        solarPanelsMesh.instanceMatrix.needsUpdate = true;
+        createBuildingLabel('ARRAY PANEL SURYA (PLTS)', -380, 22, 340, 'rgba(23, 37, 84, 0.9)', '#93c5fd');
+
+        // 2B. Kantor Pusat, Command Center IoT, EV Charging, Kantin & Mes Pekerja
+        const adminHousingBase = new THREE.Mesh(
+            new THREE.BoxGeometry(240, 0.8, 530),
+            new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 })
+        );
+        adminHousingBase.position.set(-145, 0.4, 300);
+        adminHousingBase.receiveShadow = true;
+        scene.add(adminHousingBase);
+
+        // Kantor Pusat & Command Center IoT
+        const mainOffice = createPitchedBuilding(125, 18, 65, 0xf8fafc, 0x0f172a, false, false);
+        mainOffice.position.set(-165, 0.8, 95);
+        scene.add(mainOffice);
+        createBuildingLabel('KANTOR PUSAT & ADMIN', -165, 31, 95, 'rgba(15, 23, 42, 0.9)', '#38bdf8');
+
+        // Tower Pemancar IoT
+        const iotTower = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.2, 2.5, 42, 8),
+            new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.2 })
+        );
+        iotTower.position.set(-75, 22, 95);
+        iotTower.castShadow = true;
+        scene.add(iotTower);
+        createBuildingLabel('IOT TOWER', -75, 46, 95, 'rgba(15, 23, 42, 0.95)', '#38bdf8');
+
+        // EV Charging Station
+        const evCanopy = new THREE.Mesh(
+            new THREE.BoxGeometry(110, 1.2, 45),
+            new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.6, roughness: 0.25 })
+        );
+        evCanopy.position.set(-145, 11, 195);
+        evCanopy.castShadow = true;
+        scene.add(evCanopy);
+
+        for (let px = -45; px <= 45; px += 45) {
+            for (let pz = -16; pz <= 16; pz += 32) {
+                const pillar = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1.0, 1.0, 11, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x94a3b8 })
+                );
+                pillar.position.set(-145 + px, 5.5, 195 + pz);
+                scene.add(pillar);
+            }
+        }
+        createBuildingLabel('EV CHARGING STATION', -145, 19, 195, 'rgba(30, 58, 138, 0.95)', '#60a5fa');
+
+        // Kantin & Aula Pekerja
+        const canteen = createPitchedBuilding(175, 11, 65, 0xfef3c7, 0xb45309, true, false);
+        canteen.position.set(-145, 0.8, 305);
+        scene.add(canteen);
+        createBuildingLabel('KANTIN & AULA PEKERJA', -145, 23, 305, 'rgba(180, 83, 9, 0.9)', '#fcd34d');
+
+        // Gedung Hunian / Mes Pekerja Utama
+        const mainDormitory = createPitchedBuilding(195, 16, 130, 0xe2e8f0, 0xc2410c, false, false);
+        mainDormitory.position.set(-145, 0.8, 455);
+        scene.add(mainDormitory);
+        createBuildingLabel('GEDUNG HUNIAN / MES PEKERJA', -145, 30, 455, 'rgba(194, 65, 12, 0.9)', '#fdba74');
+
+        // =========================================================================
+        // 3. ZONA PRODUKSI PASCAPANEN & LOGISTIK (TENGAH SELATAN, x: 25 s/d 225)
+        // =========================================================================
+        const agroLogisticsBase = new THREE.Mesh(
+            new THREE.BoxGeometry(200, 0.8, 530),
+            new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 })
+        );
+        agroLogisticsBase.position.set(125, 0.4, 300);
+        agroLogisticsBase.receiveShadow = true;
+        scene.add(agroLogisticsBase);
+
+        // Gudang Alat, Pupuk & Stasiun BBM/Genset
+        const warehouse1 = createPitchedBuilding(95, 15, 55, 0xcbd5e1, 0x334155, false, true);
+        warehouse1.position.set(85, 0.8, 95);
+        scene.add(warehouse1);
+        createBuildingLabel('GUDANG ALAT & PUPUK', 85, 27, 95, 'rgba(51, 65, 85, 0.9)', '#cbd5e1');
+
+        const fuelGenset = createPitchedBuilding(65, 12, 55, 0x94a3b8, 0x991b1b, true, true);
+        fuelGenset.position.set(180, 0.8, 95);
+        scene.add(fuelGenset);
+        createBuildingLabel('STASIUN BBM & GENSET', 180, 24, 95, 'rgba(153, 27, 27, 0.9)', '#fca5a5');
+
+        // Bangsal Panen & Sortasi Awal
+        const harvestShelter = createPitchedBuilding(175, 10, 60, 0xfef08a, 0x854d0e, false, false);
+        harvestShelter.position.set(125, 0.8, 195);
+        scene.add(harvestShelter);
+        createBuildingLabel('BANGSAL PANEN & SORTASI', 125, 21, 195, 'rgba(133, 77, 14, 0.9)', '#fde047');
+
+        // 2 Barn Pengering Tembakau Besar
+        for (let b = 0; b < 2; b++) {
+            const bx = 80 + b * 90;
+            const barn = createPitchedBuilding(75, 22, 105, 0xb45309, 0x7f1d1d, true, true);
+            barn.position.set(bx, 0.8, 320);
+            scene.add(barn);
+            createBuildingLabel(`BARN PENGERING ${b + 1}`, bx, 38, 320, 'rgba(127, 29, 29, 0.9)', '#fca5a5');
+        }
+
+        // Gedung Grading & Timbang Ekspor
+        const gradingHall = createPitchedBuilding(175, 14, 95, 0xfed7aa, 0x9a3412, false, true);
+        gradingHall.position.set(125, 0.8, 465);
+        scene.add(gradingHall);
+        createBuildingLabel('GEDUNG GRADING & TIMBANG', 125, 26, 465, 'rgba(154, 52, 18, 0.9)', '#fdba74');
+
+        // =========================================================================
+        // 4. ZONA BIOSEKURITI PETERNAKAN, MAGGOT & BENGKEL (TIMUR TENGAH)
+        // =========================================================================
+        
+        // 4A. 9 Kandang Ayam Petelur (Diperpanjang ke utara hingga z: -565)
+        const chickenGround = new THREE.Mesh(
+            new THREE.BoxGeometry(340, 0.8, 370),
+            new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.95 })
+        );
+        chickenGround.position.set(205, 0.4, -380);
+        chickenGround.receiveShadow = true;
+        scene.add(chickenGround);
+
+        const chickenMeshGroup = new THREE.Group();
+        chickenMeshGroup.position.set(205, 0, -380);
+        scene.add(chickenMeshGroup);
+
+        function createChickenCoopBuilding() {
+            const coop = new THREE.Group();
+            const w = 92, h = 11, d = 34;
+
+            const pillarGeo = new THREE.BoxGeometry(1.5, 4, 1.5);
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+            for (let px = -w / 2 + 4; px <= w / 2 - 4; px += 18) {
+                for (let pz = -d / 2 + 3; pz <= d / 2 - 3; pz += d - 6) {
+                    const p = new THREE.Mesh(pillarGeo, pillarMat);
+                    p.position.set(px, 2, pz);
+                    coop.add(p);
+                }
+            }
+
+            const floor = new THREE.Mesh(
+                new THREE.BoxGeometry(w, 1, d),
+                new THREE.MeshStandardMaterial({ color: 0xd97706 })
+            );
+            floor.position.y = 4.2;
+            floor.castShadow = true;
+            coop.add(floor);
+
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(w - 2, h, d - 2),
+                new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.7 })
+            );
+            body.position.y = 4.7 + h / 2;
+            body.castShadow = true;
+            coop.add(body);
+
+            const roof = createPitchedBuilding(w, 0.5, d, 0xfef3c7, 0xb91c1c, false, false);
+            roof.position.y = 4.7 + h - 1.2;
+            coop.add(roof);
+
+            const monitor = new THREE.Mesh(
+                new THREE.BoxGeometry(w * 0.85, 2.5, 6),
+                new THREE.MeshStandardMaterial({ color: 0x991b1b })
+            );
+            monitor.position.y = 4.7 + h + 5.5;
+            coop.add(monitor);
+
+            const silo = new THREE.Mesh(
+                new THREE.CylinderGeometry(3.2, 3.2, 16, 12),
+                new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.6, roughness: 0.3 })
+            );
+            silo.position.set(w / 2 + 4, 8, 0);
+            silo.castShadow = true;
+            coop.add(silo);
+
+            return coop;
+        }
+
+        for (let i = 0; i < 9; i++) {
+            const col = i % 3;
+            const row = Math.floor(i / 3);
+            const x = col * 110 - 110;
+            const z = row * 105 - 105;
+
+            const coop = createChickenCoopBuilding();
+            coop.position.set(x, 0, z);
+            chickenMeshGroup.add(coop);
+        }
+        createBuildingLabel('9 KANDANG AYAM PETELUR', 205, 32, -380, 'rgba(120, 53, 15, 0.9)', '#fbbf24');
+
+        // 4B. Unit Biokonversi Maggot BSF
+        const maggotBase = new THREE.Mesh(
+            new THREE.BoxGeometry(440, 0.8, 140),
+            new THREE.MeshStandardMaterial({ color: 0x57534e, roughness: 0.9 })
+        );
+        maggotBase.position.set(255, 0.4, -105);
+        maggotBase.receiveShadow = true;
+        scene.add(maggotBase);
+
+        const bsfHanggar = createPitchedBuilding(155, 12, 95, 0xe2e8f0, 0x0284c7, true, true);
+        bsfHanggar.position.set(120, 0.8, -105);
+        scene.add(bsfHanggar);
+        createBuildingLabel('HANGGAR FERMENTASI & BSF', 120, 26, -105, 'rgba(12, 74, 110, 0.9)', '#38bdf8');
+
+        const maggotRackGroup = new THREE.Group();
+        maggotRackGroup.position.set(340, 0.8, -105);
+        scene.add(maggotRackGroup);
+
+        const binGeo = new THREE.BoxGeometry(22, 2.2, 12);
+        const binMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.4 });
+        const substrateMat = new THREE.MeshStandardMaterial({ color: 0x713f12, roughness: 0.9 });
+
+        for (let i = 0; i < 24; i++) {
+            const col = i % 6;
+            const row = Math.floor(i / 6);
+            const rx = -105 + col * 38;
+            const rz = -45 + row * 30;
+
+            for (let tier = 0; tier < 2; tier++) {
+                const bin = new THREE.Mesh(binGeo, binMat);
+                bin.position.set(rx, 2 + tier * 4, rz);
+                bin.castShadow = true;
+                maggotRackGroup.add(bin);
+
+                const media = new THREE.Mesh(new THREE.BoxGeometry(20, 0.6, 10.5), substrateMat);
+                media.position.set(rx, 3.1 + tier * 4, rz);
+                maggotRackGroup.add(media);
+            }
+        }
+        createBuildingLabel('RAK BIOKONVERSI MAGGOT', 340, 22, -105, 'rgba(30, 58, 138, 0.9)', '#60a5fa');
+
+        // 4C. Laboratorium Lapangan & Karantina Steril
+        const biosecurityBase = new THREE.Mesh(
+            new THREE.BoxGeometry(220, 0.8, 210),
+            new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 })
+        );
+        biosecurityBase.position.set(360, 0.4, 140);
+        biosecurityBase.receiveShadow = true;
+        scene.add(biosecurityBase);
+
+        const labBuilding = createPitchedBuilding(150, 12, 75, 0xf8fafc, 0x047857, false, true);
+        labBuilding.position.set(360, 0.8, 140);
+        scene.add(labBuilding);
+        createBuildingLabel('LAB LAPANGAN & KARANTINA STERIL', 360, 25, 140, 'rgba(4, 120, 87, 0.95)', '#34d399');
+
+        // 4D. BENGKEL & PERAWATAN ALSINTAN (Area Garis Merah: x: 360, z: 410)
+        const workshopBase = new THREE.Mesh(
+            new THREE.BoxGeometry(220, 0.8, 290),
+            new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 })
+        );
+        workshopBase.position.set(360, 0.4, 410);
+        workshopBase.receiveShadow = true;
+        scene.add(workshopBase);
+
+        // Gedung Bengkel Utama (Dengan Pintu Garasi Besar & Ventilasi Atap)
+        const mainWorkshop = createPitchedBuilding(165, 16, 95, 0xe2e8f0, 0x1e293b, true, true);
+        mainWorkshop.position.set(360, 0.8, 370);
+        scene.add(mainWorkshop);
+        createBuildingLabel('BENGKEL & PERAWATAN ALSINTAN', 360, 32, 370, 'rgba(30, 41, 59, 0.95)', '#f59e0b');
+
+        // Gudang Suku Cadang & Parkir Alat Berat (Selatan Bengkel)
+        const sparepartWarehouse = createPitchedBuilding(135, 11, 55, 0xcbd5e1, 0x334155, false, true);
+        sparepartWarehouse.position.set(360, 0.8, 485);
+        scene.add(sparepartWarehouse);
+        createBuildingLabel('GUDANG SUKU CADANG', 360, 23, 485, 'rgba(51, 65, 85, 0.95)', '#cbd5e1');
+
+        // =========================================================================
+        // 5. ZONA KOTOR / LIMBAH TERISOLASI (UJUNG TIMUR LAUT, Diperpanjang ke utara)
+        // =========================================================================
+        const wasteBase = new THREE.Mesh(
+            new THREE.BoxGeometry(150, 0.8, 530),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95 })
+        );
+        wasteBase.position.set(605, 0.4, -300);
+        wasteBase.receiveShadow = true;
+        scene.add(wasteBase);
+
+        // 5A. Rumah Kompos & Pengeringan Kasgot
+        const compoHouse = createPitchedBuilding(110, 13, 85, 0xe2e8f0, 0x475569, true, true);
+        compoHouse.position.set(605, 0.8, -485);
+        scene.add(compoHouse);
+        createBuildingLabel('RUMAH KOMPOS & KASGOT', 605, 25, -485, 'rgba(51, 65, 85, 0.95)', '#cbd5e1');
+
+        // 5B. 4 Kolam IPAL & Aerasi Limbah Cair
+        const ipalFrameMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 });
+        const ipalWaterMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2, metalness: 0.3 });
+        
+        for (let p = 0; p < 4; p++) {
+            const pz = -365 + p * 42;
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(110, 2.2, 30), ipalFrameMat);
+            frame.position.set(605, 1.5, pz);
+            frame.receiveShadow = true;
+            scene.add(frame);
+
+            const water = new THREE.Mesh(new THREE.BoxGeometry(104, 2.4, 24), ipalWaterMat);
+            water.position.set(605, 1.5, pz);
+            scene.add(water);
+        }
+        createBuildingLabel('KOLAM IPAL & AERASI TERPADU', 605, 18, -300, 'rgba(12, 74, 110, 0.95)', '#38bdf8');
+
+        // 5C. TPS Limbah B3 & Insinerator Medis
+        const tpsB3 = createPitchedBuilding(105, 11, 75, 0xf1f5f9, 0x991b1b, true, true);
+        tpsB3.position.set(605, 0.8, -115);
+        scene.add(tpsB3);
+        createBuildingLabel('TPS LIMBAH B3 & INSINERATOR', 605, 23, -115, 'rgba(153, 27, 27, 0.95)', '#fca5a5');
+
+        // =========================================================================
+        // 6. BLOK CADANGAN EKSPANSI MASA DEPAN (Diperpanjang ke selatan hingga z: +570)
+        // =========================================================================
+        const futureBlock = new THREE.Mesh(
+            new THREE.BoxGeometry(150, 0.4, 530),
+            new THREE.MeshStandardMaterial({ color: 0x4d7c0f, roughness: 0.95 })
+        );
+        futureBlock.position.set(605, 0.2, 300);
+        futureBlock.receiveShadow = true;
+        scene.add(futureBlock);
+        createBuildingLabel('Cadangan)', 605, 18, 300, 'rgba(20, 83, 45, 0.85)', '#86efac');
+
+        // =========================================================================
+        // 7. INFRASTRUKTUR JALAN ASPAL, GREEN BUFFER & MAIN SECURITY GATE
+        // =========================================================================
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+
+        // Jalan Poros Utama Timur-Barat (z: 0)
+        const roadX = new THREE.Mesh(new THREE.BoxGeometry(1200, 0.5, 30), roadMat);
+        roadX.position.set(100, 0.3, 0);
+        roadX.receiveShadow = true;
+        scene.add(roadX);
+
+        // Jalan Poros Utama Utara-Selatan (x: 0 - Panjang penuh 1200)
+        const roadZ = new THREE.Mesh(new THREE.BoxGeometry(30, 0.5, 1200), roadMat);
+        roadZ.position.set(0, 0.3, 0);
+        roadZ.receiveShadow = true;
+        scene.add(roadZ);
+
+        // Jalan Isolasi Zona Limbah (x: 500 - Panjang penuh 1200)
+        const roadWasteZ = new THREE.Mesh(new THREE.BoxGeometry(26, 0.5, 1200), roadMat);
+        roadWasteZ.position.set(500, 0.3, 0);
+        roadWasteZ.receiveShadow = true;
+        scene.add(roadWasteZ);
+
+        // Jalan Lingkar Luar Keliling Kawasan (Menempel tepat di tepi grid -600 s/d +600)
+        const roadNorth = new THREE.Mesh(new THREE.BoxGeometry(1200, 0.5, 20), roadMat);
+        roadNorth.position.set(100, 0.3, -590);
+        scene.add(roadNorth);
+        const roadSouth = new THREE.Mesh(new THREE.BoxGeometry(1200, 0.5, 20), roadMat);
+        roadSouth.position.set(100, 0.3, 590);
+        scene.add(roadSouth);
+        const roadWest = new THREE.Mesh(new THREE.BoxGeometry(20, 0.5, 1200), roadMat);
+        roadWest.position.set(-490, 0.3, 0);
+        scene.add(roadWest);
+        const roadEast = new THREE.Mesh(new THREE.BoxGeometry(20, 0.5, 1200), roadMat);
+        roadEast.position.set(690, 0.3, 0);
+        scene.add(roadEast);
+
+        // Marka Jalan Poros
+        for (let m = -460; m <= 660; m += 35) {
+            if (Math.abs(m) < 25 || Math.abs(m - 500) < 20) continue;
+            const dashX = new THREE.Mesh(new THREE.PlaneGeometry(16, 1.5), stripeMat);
+            dashX.rotation.x = -Math.PI / 2;
+            dashX.position.set(m, 0.6, 0);
+            scene.add(dashX);
+        }
+        for (let m = -560; m <= 560; m += 35) {
+            if (Math.abs(m) < 25) continue;
+            const dashZ = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 16), stripeMat);
+            dashZ.rotation.x = -Math.PI / 2;
+            dashZ.position.set(0, 0.6, m);
+            scene.add(dashZ);
+        }
+
+        // Sabuk Hijau (Green Buffer Pohon) Penyekat Bau & Debu
+        // 1. Sepanjang jalur pemisah Zona Bersih & Zona Produksi (x: -22)
+        for (let tz = -560; tz <= 560; tz += 42) {
+            if (Math.abs(tz) < 35) continue;
+            plantTree(-22, tz);
+        }
+        // 2. Sepanjang jalur isolasi Zona Kotor / Limbah (x: 482)
+        for (let tz = -560; tz <= -35; tz += 38) {
+            plantTree(482, tz);
+        }
+
+        // Main Security Gate & Pos Jaga di Pintu Masuk Selatan (x: 0, z: 585)
+        const mainGateHouse = createPitchedBuilding(22, 8, 18, 0xf1f5f9, 0x1e293b, false, false);
+        mainGateHouse.position.set(30, 0.8, 585);
+        scene.add(mainGateHouse);
+
+        const gateArch = new THREE.Mesh(
+            new THREE.BoxGeometry(36, 1.5, 4),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a })
+        );
+        gateArch.position.set(0, 12, 585);
+        gateArch.castShadow = true;
+        scene.add(gateArch);
+
+        for (let gx = -16; gx <= 16; gx += 32) {
+            const pillar = new THREE.Mesh(
+                new THREE.BoxGeometry(2.5, 12, 3.5),
+                new THREE.MeshStandardMaterial({ color: 0x334155 })
+            );
+            pillar.position.set(gx, 6, 585);
+            scene.add(pillar);
+        }
+
+        const gateBarrier = new THREE.Mesh(
+            new THREE.BoxGeometry(28, 0.6, 0.8),
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b })
+        );
+        gateBarrier.position.set(0, 3.8, 585);
+        scene.add(gateBarrier);
+        createBuildingLabel('POS JAGA & MAIN GATE', 0, 20, 585, 'rgba(30, 41, 59, 0.95)', '#fbbf24');
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (targetCamPos && targetLookAt) {
+                camera.position.lerp(targetCamPos, 0.06);
+                controls.target.lerp(targetLookAt, 0.06);
+                if (camera.position.distanceTo(targetCamPos) < 1) {
+                    targetCamPos = null;
+                    targetLookAt = null;
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
