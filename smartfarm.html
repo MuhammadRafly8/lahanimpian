@@ -10,8 +10,628 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #020617; font-family: ui-sans-serif, system-ui, sans-serif; }
+        :root {
+            color-scheme: dark;
+            --panel: rgba(10, 25, 29, 0.88);
+            --panel-border: rgba(226, 232, 240, 0.14);
+            --muted: #a7b8b2;
+            --accent: #34d399;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020617;
+            color: #f8fafc;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+
+        button { font: inherit; }
         canvas { display: block; }
+
+        .map-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            padding: 18px;
+            pointer-events: none;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            pointer-events: auto;
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 250px;
+            padding: 10px 16px 10px 10px;
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            background: var(--panel);
+            box-shadow: 0 12px 32px rgba(2, 6, 23, 0.2);
+            backdrop-filter: blur(16px);
+        }
+
+        .menu-button {
+            display: grid;
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            place-items: center;
+            border: 1px solid rgba(52, 211, 153, 0.25);
+            border-radius: 13px;
+            color: #d1fae5;
+            background: rgba(16, 185, 129, 0.12);
+            cursor: pointer;
+            transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+        }
+
+        .menu-button:hover { background: rgba(16, 185, 129, 0.22); transform: translateY(-1px); }
+
+        .brand-mark {
+            display: grid;
+            width: 38px;
+            height: 38px;
+            flex: 0 0 auto;
+            place-items: center;
+            border-radius: 12px;
+            color: #052e25;
+            background: linear-gradient(145deg, #6ee7b7, #34d399);
+        }
+
+        .brand-title { margin: 0; font-size: 13px; font-weight: 750; letter-spacing: 0.01em; }
+        .brand-subtitle { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+
+        .live-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 5px;
+            color: #a7f3d0;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .live-status::before {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 10px rgba(52, 211, 153, 0.8);
+            content: "";
+        }
+
+        .zone-nav {
+            display: flex;
+            max-width: min(74vw, 1040px);
+            gap: 6px;
+            padding: 8px;
+            overflow-x: auto;
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            background: var(--panel);
+            box-shadow: 0 12px 32px rgba(2, 6, 23, 0.2);
+            backdrop-filter: blur(16px);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.38) transparent;
+        }
+
+        .zone-button {
+            min-height: 36px;
+            flex: 0 0 auto;
+            padding: 0 12px;
+            border: 1px solid transparent;
+            border-radius: 11px;
+            color: #d4dfdc;
+            background: transparent;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+        }
+
+        .zone-button:hover {
+            color: #f8fafc;
+            border-color: rgba(226, 232, 240, 0.12);
+            background: rgba(226, 232, 240, 0.08);
+        }
+
+        .zone-button.is-active {
+            color: #052e25;
+            border-color: rgba(110, 231, 183, 0.7);
+            background: #6ee7b7;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.18);
+        }
+
+        .zone-button.is-isolated:not(.is-active) { color: #fecaca; }
+        .zone-button.is-isolated:hover:not(.is-active) { background: rgba(153, 27, 27, 0.38); }
+
+        .menu-button:focus-visible,
+        .zone-button:focus-visible,
+        .sidebar-close:focus-visible {
+            outline: 2px solid #6ee7b7;
+            outline-offset: 3px;
+        }
+
+        .side-panel {
+            position: absolute;
+            top: 92px;
+            left: 18px;
+            width: min(360px, calc(100vw - 36px));
+            max-height: calc(100vh - 112px);
+            padding: 20px;
+            overflow-y: auto;
+            border: 1px solid var(--panel-border);
+            border-radius: 20px;
+            background: rgba(10, 25, 29, 0.95);
+            box-shadow: 0 24px 60px rgba(2, 6, 23, 0.38);
+            backdrop-filter: blur(18px);
+            transition: transform 260ms ease, opacity 220ms ease;
+            pointer-events: auto;
+        }
+
+        .side-panel.is-closed { transform: translateX(calc(-100% - 28px)); opacity: 0; }
+        .side-panel.is-open { transform: translateX(0); opacity: 1; }
+
+        .sidebar-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.12);
+        }
+
+        .sidebar-kicker {
+            margin: 0 0 6px;
+            color: #6ee7b7;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .sidebar-title { margin: 0; font-size: 15px; font-weight: 750; }
+        .sidebar-description { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+        .sidebar-close {
+            display: grid;
+            width: 32px;
+            height: 32px;
+            flex: 0 0 auto;
+            place-items: center;
+            border: 1px solid rgba(226, 232, 240, 0.12);
+            border-radius: 10px;
+            color: #cbd5e1;
+            background: rgba(226, 232, 240, 0.06);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .zone-details { display: grid; gap: 10px; padding-top: 14px; }
+
+        .zone-section {
+            padding: 12px;
+            border: 1px solid rgba(226, 232, 240, 0.09);
+            border-radius: 14px;
+            background: rgba(226, 232, 240, 0.035);
+        }
+
+        .zone-section-title { margin: 0; font-size: 11px; font-weight: 700; line-height: 1.5; }
+        .zone-section ul { margin: 8px 0 0; padding-left: 17px; color: #c0ccc8; font-size: 11px; line-height: 1.65; }
+        .zone-section li + li { margin-top: 3px; }
+
+        .process-launch {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+            padding: 13px;
+            border: 1px solid rgba(52, 211, 153, 0.25);
+            border-radius: 14px;
+            color: #ecfdf5;
+            text-align: left;
+            background: linear-gradient(120deg, rgba(6, 78, 59, 0.75), rgba(15, 23, 42, 0.82));
+            cursor: pointer;
+            transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+        }
+
+        .process-launch:hover { transform: translateY(-2px); border-color: rgba(110, 231, 183, 0.7); }
+        .process-launch-icon { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: #052e25; background: #6ee7b7; font-size: 18px; }
+        .process-launch-title { display: block; font-size: 12px; font-weight: 750; }
+        .process-launch-copy { display: block; margin-top: 3px; color: #b6d7ca; font-size: 10px; line-height: 1.45; }
+        .process-launch-arrow { margin-left: auto; color: #a7f3d0; font-size: 19px; }
+
+        .process-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            overflow: hidden;
+            background: rgba(2, 8, 8, 0.72);
+            backdrop-filter: blur(12px);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 240ms ease, visibility 240ms ease;
+        }
+
+        .process-backdrop.is-visible { opacity: 1; visibility: visible; pointer-events: auto; }
+
+        .process-modal {
+            position: relative;
+            display: flex;
+            width: min(1180px, 100%);
+            max-height: min(92vh, 1050px);
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(167, 243, 208, 0.2);
+            border-radius: 24px;
+            background: linear-gradient(145deg, rgba(13, 30, 31, 0.99), rgba(7, 17, 24, 0.99));
+            box-shadow: 0 32px 100px rgba(0, 0, 0, 0.55), 0 0 60px rgba(16, 185, 129, 0.08);
+            transform: translateY(20px) scale(0.975);
+            transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .process-backdrop.is-visible .process-modal { transform: translateY(0) scale(1); }
+
+        .process-modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 24px 28px 20px;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.1);
+            background: rgba(9, 22, 27, 0.96);
+        }
+
+        .process-eyebrow { margin: 0 0 8px; color: #6ee7b7; font-size: 10px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
+        .process-title { margin: 0; color: #f0fdf4; font-size: clamp(22px, 3vw, 32px); font-weight: 760; letter-spacing: -0.035em; }
+        .process-intro { max-width: 760px; margin: 8px 0 0; color: #b5c7c1; font-size: 13px; line-height: 1.7; }
+
+        .process-close {
+            display: grid;
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            place-items: center;
+            border: 1px solid rgba(226, 232, 240, 0.16);
+            border-radius: 13px;
+            color: #e2e8f0;
+            background: rgba(226, 232, 240, 0.07);
+            font-size: 23px;
+            cursor: pointer;
+            transition: background 160ms ease, transform 160ms ease;
+        }
+
+        .process-close:hover { transform: rotate(4deg); background: rgba(226, 232, 240, 0.14); }
+
+        .process-content { overflow-y: auto; padding: 22px 28px 30px; scrollbar-color: rgba(110, 231, 183, 0.35) transparent; }
+
+        .process-summary {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding: 14px 16px;
+            border: 1px solid rgba(96, 165, 250, 0.18);
+            border-radius: 14px;
+            color: #cbd9df;
+            background: rgba(30, 64, 91, 0.2);
+            font-size: 12px;
+            line-height: 1.65;
+        }
+
+        .process-summary strong { color: #e0f2fe; }
+        .process-summary-mark { flex: 0 0 auto; color: #7dd3fc; font-size: 17px; }
+
+        .process-flow-wrap {
+            position: relative;
+            margin-bottom: 25px;
+            padding: 22px 18px 18px;
+            overflow: hidden;
+            border: 1px solid rgba(167, 243, 208, 0.12);
+            border-radius: 20px;
+            background:
+                radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.11), transparent 58%),
+                linear-gradient(145deg, rgba(15, 39, 38, 0.76), rgba(8, 20, 27, 0.82));
+            perspective: 1100px;
+        }
+
+        .process-flow-wrap::before {
+            position: absolute;
+            right: -5%;
+            bottom: -44%;
+            left: -5%;
+            height: 85%;
+            border-top: 1px solid rgba(110, 231, 183, 0.12);
+            background-image: linear-gradient(rgba(110, 231, 183, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(110, 231, 183, 0.045) 1px, transparent 1px);
+            background-size: 34px 34px;
+            content: "";
+            pointer-events: none;
+            transform: rotateX(58deg);
+            transform-origin: top;
+        }
+
+        .process-flow-label { position: relative; z-index: 1; margin: 0 0 18px; color: #9fb7ad; font-size: 10px; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; }
+
+        .process-flow {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .process-flow::before {
+            position: absolute;
+            top: 31px;
+            right: 7%;
+            left: 7%;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.8), rgba(52, 211, 153, 0.15));
+            content: "";
+        }
+
+        .process-flow::after {
+            position: absolute;
+            top: 26px;
+            left: 6%;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(209, 250, 229, 0.9);
+            border-radius: 50%;
+            background: #34d399;
+            box-shadow: 0 0 16px rgba(52, 211, 153, 0.85);
+            content: "";
+            animation: process-travel 9s linear infinite;
+        }
+
+        @keyframes process-travel {
+            from { left: 6%; }
+            to { left: calc(94% - 12px); }
+        }
+
+        @keyframes process-float {
+            0%, 100% { transform: translateY(0) translateZ(14px); }
+            50% { transform: translateY(-3px) translateZ(14px); }
+        }
+
+        .process-node {
+            position: relative;
+            z-index: 1;
+            min-width: 0;
+            padding: 12px 10px 11px;
+            border: 1px solid rgba(167, 243, 208, 0.16);
+            border-radius: 15px;
+            color: #e2e8f0;
+            text-align: left;
+            background: linear-gradient(145deg, rgba(26, 54, 51, 0.96), rgba(12, 27, 35, 0.98));
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transform: rotateX(8deg) rotateY(-5deg) translateZ(0);
+            transform-style: preserve-3d;
+            transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+        }
+
+        .process-node:hover,
+        .process-node:focus-visible {
+            z-index: 2;
+            border-color: rgba(110, 231, 183, 0.7);
+            box-shadow: 0 18px 28px rgba(0, 0, 0, 0.32), 0 0 20px rgba(16, 185, 129, 0.1);
+            transform: rotateX(0) rotateY(0) translateY(-5px) translateZ(16px);
+        }
+
+        .process-node-icon {
+            display: grid;
+            width: 38px;
+            height: 38px;
+            margin-bottom: 10px;
+            place-items: center;
+            border: 1px solid rgba(110, 231, 183, 0.24);
+            border-radius: 12px;
+            color: #a7f3d0;
+            background: linear-gradient(145deg, rgba(16, 185, 129, 0.25), rgba(15, 23, 42, 0.62));
+            box-shadow: 0 8px 14px rgba(0, 0, 0, 0.25), inset 0 1px rgba(255, 255, 255, 0.12);
+            font-size: 19px;
+            animation: process-float 4s ease-in-out infinite;
+        }
+
+        .process-node-step { display: block; color: #7dd3b0; font-size: 9px; font-weight: 800; letter-spacing: 0.08em; }
+        .process-node-title { display: block; margin-top: 4px; font-size: 11px; font-weight: 750; line-height: 1.4; }
+        .process-node-caption { display: block; margin-top: 5px; color: #9fb2ad; font-size: 9px; line-height: 1.45; }
+
+        .process-chapters { display: grid; gap: 14px; }
+
+        .process-chapter {
+            display: grid;
+            grid-template-columns: 58px minmax(0, 1fr);
+            gap: 16px;
+            padding: 20px;
+            scroll-margin-top: 18px;
+            border: 1px solid rgba(226, 232, 240, 0.1);
+            border-radius: 18px;
+            background: linear-gradient(120deg, rgba(226, 232, 240, 0.045), rgba(226, 232, 240, 0.018));
+        }
+
+        .process-chapter-number {
+            display: grid;
+            width: 48px;
+            height: 48px;
+            place-items: center;
+            border: 1px solid rgba(110, 231, 183, 0.28);
+            border-radius: 15px;
+            color: #a7f3d0;
+            background: rgba(16, 185, 129, 0.12);
+            font-size: 15px;
+            font-weight: 800;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+        }
+
+        .process-chapter h3 { margin: 0; color: #f0fdf4; font-size: 16px; font-weight: 750; letter-spacing: -0.01em; }
+        .process-location { display: inline-flex; align-items: center; gap: 6px; margin-top: 7px; color: #7dd3b0; font-size: 10px; font-weight: 700; }
+        .process-chapter p { margin: 10px 0 0; color: #c0cdc9; font-size: 12px; line-height: 1.75; }
+        .process-chapter strong { color: #e2f5eb; }
+
+        .process-method-heading { margin: 15px 0 0; color: #a7f3d0; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+
+        .process-method {
+            display: grid;
+            gap: 8px;
+            margin: 14px 0 0;
+            padding: 0;
+            counter-reset: method-step;
+            list-style: none;
+        }
+
+        .process-method li {
+            display: grid;
+            grid-template-columns: 30px minmax(0, 1fr);
+            align-items: start;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid rgba(226, 232, 240, 0.07);
+            border-radius: 12px;
+            background: rgba(2, 8, 8, 0.2);
+            counter-increment: method-step;
+        }
+
+        .process-method li::before {
+            display: grid;
+            width: 28px;
+            height: 28px;
+            place-items: center;
+            border: 1px solid rgba(110, 231, 183, 0.2);
+            border-radius: 9px;
+            color: #a7f3d0;
+            background: rgba(16, 185, 129, 0.1);
+            content: counter(method-step, decimal-leading-zero);
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        .process-method h4 { margin: 1px 0 0; color: #e2f5eb; font-size: 11px; font-weight: 750; line-height: 1.5; }
+        .process-method p { margin: 3px 0 0; color: #b7c8c2; font-size: 11px; line-height: 1.65; }
+
+        .process-control {
+            margin-top: 12px;
+            padding: 11px 13px;
+            border-left: 2px solid #34d399;
+            border-radius: 0 10px 10px 0;
+            color: #b6c8c0;
+            background: rgba(16, 185, 129, 0.07);
+            font-size: 10px;
+            line-height: 1.65;
+        }
+
+        .process-control strong { color: #a7f3d0; }
+
+        .process-variable {
+            display: inline-block;
+            margin: 10px 6px 0 0;
+            padding: 5px 8px;
+            border: 1px solid rgba(251, 191, 36, 0.16);
+            border-radius: 999px;
+            color: #fde68a;
+            background: rgba(120, 85, 20, 0.12);
+            font-size: 9px;
+            font-weight: 650;
+        }
+
+        .process-map-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 14px;
+            padding: 8px 11px;
+            border: 1px solid rgba(110, 231, 183, 0.2);
+            border-radius: 10px;
+            color: #a7f3d0;
+            background: rgba(16, 185, 129, 0.08);
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 160ms ease, border-color 160ms ease;
+        }
+
+        .process-map-link:hover { border-color: rgba(110, 231, 183, 0.55); background: rgba(16, 185, 129, 0.16); }
+
+        .process-note {
+            margin-top: 18px;
+            padding: 16px 18px;
+            border: 1px solid rgba(251, 191, 36, 0.22);
+            border-radius: 15px;
+            color: #d7d2c2;
+            background: rgba(120, 85, 20, 0.13);
+            font-size: 11px;
+            line-height: 1.7;
+        }
+
+        .process-note strong { color: #fde68a; }
+
+        .process-modal :focus-visible,
+        .process-launch:focus-visible {
+            outline: 2px solid #6ee7b7;
+            outline-offset: 3px;
+        }
+
+        @media (max-width: 900px) {
+            .map-overlay { padding: 12px; }
+            .topbar { flex-direction: column; gap: 10px; }
+            .brand-group { min-width: 0; }
+            .zone-nav { width: 100%; max-width: 100%; }
+            .side-panel { top: 160px; left: 12px; max-height: calc(100vh - 172px); }
+            .process-backdrop { padding: 14px; }
+            .process-modal { max-height: 94vh; }
+            .process-flow { width: max-content; min-width: 900px; grid-template-columns: repeat(6, minmax(135px, 1fr)); overflow: visible; padding: 0 3px 12px; }
+            .process-flow-wrap { overflow-x: auto; }
+        }
+
+        @media (max-width: 480px) {
+            .brand-group { padding: 8px 12px 8px 8px; border-radius: 15px; }
+            .menu-button { width: 40px; height: 40px; }
+            .brand-mark { width: 34px; height: 34px; }
+            .brand-title { font-size: 12px; }
+            .zone-nav { padding: 6px; border-radius: 15px; }
+            .zone-button { min-height: 34px; padding: 0 10px; font-size: 10px; }
+            .side-panel { top: 148px; padding: 16px; }
+            .process-backdrop { padding: 0; }
+            .process-modal { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+            .process-modal-header { padding: 20px 18px 16px; }
+            .process-intro { font-size: 12px; }
+            .process-content { padding: 16px 14px 24px; }
+            .process-flow-wrap { margin-right: -14px; margin-left: -14px; padding: 16px 14px; border-right: 0; border-left: 0; border-radius: 0; }
+            .process-chapter { grid-template-columns: 40px minmax(0, 1fr); gap: 11px; padding: 15px 12px; }
+            .process-chapter-number { width: 38px; height: 38px; border-radius: 12px; font-size: 12px; }
+            .process-chapter h3 { font-size: 14px; }
+            .process-method li { grid-template-columns: 26px minmax(0, 1fr); gap: 8px; padding: 9px; }
+            .process-method li::before { width: 25px; height: 25px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .process-flow::after,
+            .process-node-icon { animation: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+        }
     </style>
 </head>
 <body class="text-white">
@@ -20,80 +640,294 @@
     <div id="canvas-container" class="absolute inset-0 z-0"></div>
 
     <!-- UI Overlay -->
-    <div class="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4">
+    <div class="map-overlay">
         
         <!-- Top Bar: Tombol Hamburger & Quick Camera Fly-To -->
-        <div class="flex justify-between items-start pointer-events-auto">
-            <button onclick="toggleSidebar()" class="bg-slate-900/90 hover:bg-slate-800 backdrop-blur p-3.5 rounded-2xl border border-slate-700 shadow-2xl transition flex items-center justify-center text-white focus:outline-none group" title="Buka Menu">
-                <svg class="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="topbar">
+            <div class="brand-group">
+                <button id="menu-toggle" type="button" onclick="toggleSidebar()" class="menu-button" title="Buka menu zonasi" aria-label="Buka menu zonasi" aria-controls="parameter-sidebar" aria-expanded="false">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                </svg>
-            </button>
+                    </svg>
+                </button>
+                <span class="brand-mark" aria-hidden="true">
+                    <svg width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 4c-8 0-13 3.8-13 10a6 6 0 0 0 6 6c6.2 0 7-8 7-16Z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 21c2-5 5.2-8.3 10-11"></path>
+                    </svg>
+                </span>
+                <div>
+                    <p class="brand-title">SmartAgri 60ha</p>
+                    <p class="brand-subtitle">Peta kawasan terpadu</p>
+                    <span class="live-status">Operasional</span>
+                </div>
+            </div>
 
             <!-- Tombol Cepat Fokus Kamera Sesuai Standar Zonasi -->
-            <div class="bg-slate-900/85 backdrop-blur px-3 py-2 rounded-2xl border border-slate-700/80 shadow-xl flex flex-wrap gap-1.5 text-[11px]">
-                <button onclick="flyTo(100, 520, 680, 100, 0, 0)" class="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 transition font-semibold">Overview 60ha</button>
-                <button onclick="flyTo(-270, 130, -80, -270, 0, -255)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">1. Lahan & Waduk</button>
-                <button onclick="flyTo(-260, 130, 480, -260, 0, 260)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">2. Kantor, Mes & PLTS</button>
-                <button onclick="flyTo(120, 130, 480, 120, 0, 240)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">3. Barn & Gudang</button>
-                <button onclick="flyTo(335, 130, -100, 335, 0, -260)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">4. Kandang & Maggot</button>
-                <button onclick="flyTo(760, 140, -260, 600, 0, -260)" class="px-2.5 py-1 rounded-lg bg-red-900/80 hover:bg-red-700 transition">5. Zona Limbah (Terisolasi)</button>
-                <button onclick="flyTo(360, 110, 560, 360, 0, 365)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">6. Bengkel Alsintan</button>
-                <button onclick="flyTo(0, 80, 730, 0, 0, 585)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 transition">Main Gate</button>
-            </div>
+            <nav class="zone-nav" aria-label="Navigasi zona peta">
+                <button type="button" onclick="selectZone(this, 100, 520, 680, 100, 0, 0)" class="zone-button is-active" aria-pressed="true">Overview 60ha</button>
+                <button type="button" onclick="selectZone(this, -270, 130, -80, -270, 0, -255)" class="zone-button" aria-pressed="false">1. Lahan &amp; Waduk</button>
+                <button type="button" onclick="selectZone(this, -260, 130, 480, -260, 0, 260)" class="zone-button" aria-pressed="false">2. Kantor, Mes &amp; PLTS</button>
+                <button type="button" onclick="selectZone(this, 120, 130, 480, 120, 0, 240)" class="zone-button" aria-pressed="false">3. Barn &amp; Gudang</button>
+                <button type="button" onclick="selectZone(this, 335, 130, -100, 335, 0, -260)" class="zone-button" aria-pressed="false">4. Kandang &amp; Maggot</button>
+                <button type="button" onclick="selectZone(this, 760, 140, -260, 600, 0, -260)" class="zone-button is-isolated" aria-pressed="false">5. Zona Limbah (Terisolasi)</button>
+                <button type="button" onclick="selectZone(this, 360, 110, 560, 360, 0, 365)" class="zone-button" aria-pressed="false">6. Bengkel Alsintan</button>
+                <button type="button" onclick="selectZone(this, 0, 80, 730, 0, 0, 585)" class="zone-button" aria-pressed="false">Main Gate</button>
+            </nav>
         </div>
 
         <!-- Collapsible Sidebar / Drawer -->
-        <div id="parameter-sidebar" class="pointer-events-auto absolute top-20 left-4 bg-slate-900/95 backdrop-blur p-5 rounded-2xl border border-slate-700 w-80 min-h-[200px] max-h-[85vh] overflow-y-auto shadow-2xl transition-all duration-300 transform -translate-x-[120%] opacity-0 z-20">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+        <aside id="parameter-sidebar" class="side-panel is-closed" aria-hidden="true" inert>
+            <div class="sidebar-heading">
                 <div>
-                    <h2 class="font-bold text-sm">Standar Zonasi 60ha</h2>
-                    <p class="text-[10px] text-slate-400">Clean – Biosecurity – Isolated Waste</p>
+                    <p class="sidebar-kicker">Panduan kawasan</p>
+                    <h2 class="sidebar-title">Standar Zonasi 60ha</h2>
+                    <p class="sidebar-description">Clean – Biosecurity – Isolated Waste</p>
                 </div>
-                <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white text-sm font-bold px-2.5 py-1 rounded-lg bg-slate-800 transition">✕</button>
+                <button type="button" onclick="toggleSidebar()" class="sidebar-close" aria-label="Tutup menu zonasi">×</button>
             </div>
             
-            <div id="hamburger-menu-content" class="text-xs text-slate-300 space-y-3">
-                <div>
-                    <p class="font-semibold text-emerald-400">A. Zona Bersih (Barat & Selatan):</p>
-                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+            <button type="button" class="process-launch" onclick="openProcessModal()">
+                <span class="process-launch-icon" aria-hidden="true">↗</span>
+                <span>
+                    <span class="process-launch-title">Lihat Alur Proses SmartFarm</span>
+                    <span class="process-launch-copy">Panduan presentasi dari lahan, produksi, hingga pengelolaan hasil samping.</span>
+                </span>
+                <span class="process-launch-arrow" aria-hidden="true">›</span>
+            </button>
+
+            <div id="hamburger-menu-content" class="zone-details">
+                <section class="zone-section">
+                    <h3 class="zone-section-title text-emerald-400">A. Zona Bersih (Barat &amp; Selatan)</h3>
+                    <ul>
                         <li>Kantor Pusat, IoT Tower & EV Charging</li>
                         <li>Mes Pekerja & Kantin (Jauh dari kandang)</li>
                         <li>PLTS & Power House BESS</li>
                         <li>Lahan Tembakau & Water Reservoir Utama</li>
                     </ul>
-                </div>
-                <div class="pt-2 border-t border-slate-800">
-                    <p class="font-semibold text-amber-400">B. Zona Produksi & Pascapanen (Tengah):</p>
-                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+                </section>
+                <section class="zone-section">
+                    <h3 class="zone-section-title text-amber-400">B. Zona Produksi &amp; Pascapanen (Tengah)</h3>
+                    <ul>
                         <li>Gudang Pupuk, Alsintan & Stasiun BBM</li>
                         <li>Bangsal Panen, Sortasi, Barn & Grading</li>
                         <li>Bengkel & Perawatan Alsintan</li>
                     </ul>
-                </div>
-                <div class="pt-2 border-t border-slate-800">
-                    <p class="font-semibold text-sky-400">C. Zona Biosekuriti Ternak (Timur Tengah):</p>
-                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+                </section>
+                <section class="zone-section">
+                    <h3 class="zone-section-title text-sky-400">C. Zona Biosekuriti Ternak (Timur Tengah)</h3>
+                    <ul>
                         <li>Lab Lapangan & Pos Karantina Steril</li>
                         <li>Kandang Ayam Petelur & Unit Maggot BSF</li>
                     </ul>
-                </div>
-                <div class="pt-2 border-t border-slate-800">
-                    <p class="font-semibold text-rose-400">D. Zona Kotor / Limbah (Ujung Timur Laut):</p>
-                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] mt-1">
+                </section>
+                <section class="zone-section">
+                    <h3 class="zone-section-title text-rose-400">D. Zona Kotor / Limbah (Ujung Timur Laut)</h3>
+                    <ul>
                         <li>Terisolasi sabuk pohon (Green Buffer)</li>
                         <li>Kolam IPAL, Rumah Kompos & TPS Limbah B3</li>
                     </ul>
-                </div>
+                </section>
             </div>
-        </div>
+        </aside>
 
         <div></div>
+    </div>
+
+    <div id="process-backdrop" class="process-backdrop" aria-hidden="true">
+        <section id="process-modal" class="process-modal" role="dialog" aria-modal="true" aria-labelledby="process-title" aria-describedby="process-introduction" inert>
+            <header class="process-modal-header">
+                <div>
+                    <p class="process-eyebrow">Panduan presentasi · SmartAgri 60ha</p>
+                    <h2 id="process-title" class="process-title">Alur Proses SmartFarm</h2>
+                    <p id="process-introduction" class="process-intro">Kawasan ini dirancang untuk menghubungkan budidaya tanaman, peternakan ayam, pascapanen, dan pengelolaan hasil samping dalam satu tata ruang. Ikuti alurnya dari sumber daya hingga hasil dan siklus kembali ke lahan.</p>
+                </div>
+                <button id="process-close" type="button" class="process-close" onclick="closeProcessModal()" aria-label="Tutup penjelasan proses">×</button>
+            </header>
+
+            <div class="process-content">
+                <div class="process-summary">
+                    <span class="process-summary-mark" aria-hidden="true">◆</span>
+                    <div><strong>Cara membaca alur:</strong> tahap budidaya tanaman dan peternakan berlangsung sebagai dua jalur produksi yang saling berdampingan. Hasil panen masuk ke pascapanen; hasil samping diarahkan ke pengelolaan yang sesuai. Bengkel mendukung seluruh jalur operasional.</div>
+                </div>
+
+                <div class="process-flow-wrap">
+                    <p class="process-flow-label">Peta perjalanan proses · pilih tahap untuk membaca detail</p>
+                    <div class="process-flow" aria-label="Tahapan proses SmartFarm">
+                        <button type="button" class="process-node" onclick="focusProcessSection('process-step-1')">
+                            <span class="process-node-icon" aria-hidden="true">⌖</span>
+                            <span class="process-node-step">TAHAP 01</span>
+                            <span class="process-node-title">Akses &amp; sumber daya</span>
+                            <span class="process-node-caption">Gerbang · air · zona bersih</span>
+                        </button>
+                        <button type="button" class="process-node" onclick="focusProcessSection('process-step-2')">
+                            <span class="process-node-icon" aria-hidden="true">♧</span>
+                            <span class="process-node-step">TAHAP 02</span>
+                            <span class="process-node-title">Budidaya tanaman</span>
+                            <span class="process-node-caption">Lahan · perawatan · panen</span>
+                        </button>
+                        <button type="button" class="process-node" onclick="focusProcessSection('process-step-3')">
+                            <span class="process-node-icon" aria-hidden="true">♜</span>
+                            <span class="process-node-step">TAHAP 03</span>
+                            <span class="process-node-title">Peternakan</span>
+                            <span class="process-node-caption">Kandang · biosekuriti</span>
+                        </button>
+                        <button type="button" class="process-node" onclick="focusProcessSection('process-step-4')">
+                            <span class="process-node-icon" aria-hidden="true">◫</span>
+                            <span class="process-node-step">TAHAP 04</span>
+                            <span class="process-node-title">Pascapanen</span>
+                            <span class="process-node-caption">Sortasi · pengeringan · grading</span>
+                        </button>
+                        <button type="button" class="process-node" onclick="focusProcessSection('process-step-5')">
+                            <span class="process-node-icon" aria-hidden="true">↻</span>
+                            <span class="process-node-step">TAHAP 05</span>
+                            <span class="process-node-title">Hasil samping</span>
+                            <span class="process-node-caption">Kompos · BSF · pengolahan</span>
+                        </button>
+                        <button type="button" class="process-node" onclick="focusProcessSection('process-step-6')">
+                            <span class="process-node-icon" aria-hidden="true">⚙</span>
+                            <span class="process-node-step">PENDUKUNG</span>
+                            <span class="process-node-title">Mesin &amp; perawatan</span>
+                            <span class="process-node-caption">Menjaga semua tahap berjalan</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="process-chapters">
+                    <article id="process-step-1" class="process-chapter">
+                        <div class="process-chapter-number">01</div>
+                        <div>
+                            <h3>Akses kawasan, air, dan pemisahan zona</h3>
+                            <span class="process-location">⌖ Main Gate · Waduk &amp; Rumah Pompa · Zona Bersih</span>
+                            <p><strong>Proses dimulai dari pengaturan akses dan sumber daya.</strong> Main Gate menjadi titik masuk menuju kawasan. Tata ruang memisahkan zona bersih, produksi, biosekuriti ternak, dan area limbah agar pergerakan orang, bahan, dan hasil dapat direncanakan dengan lebih tertib. Waduk dan rumah pompa ditempatkan sebagai fasilitas penyimpanan serta pemompaan air untuk mendukung kegiatan budidaya.</p>
+                            <h4 class="process-method-heading">Urutan pengelolaan kawasan</h4>
+                            <ol class="process-method">
+                                <li><div><h4>Atur akses dan penerimaan</h4><p>Di Main Gate, rencanakan pencatatan orang, kendaraan, dan bahan yang masuk. Arahkan pengunjung dan pasokan ke tujuan yang jelas agar jalur menuju kandang, lahan, dan bangunan pascapanen tidak tercampur tanpa kendali.</p></div></li>
+                                <li><div><h4>Kelola sumber air</h4><p>Periksa sumber, mutu air, kebutuhan harian, dan kondisi pompa. Air kemudian didistribusikan ke titik penggunaan melalui jaringan yang dirancang sesuai elevasi, jarak, debit, dan kebutuhan masing-masing kegiatan.</p></div></li>
+                                <li><div><h4>Pisahkan arus bersih dan arus kotor</h4><p>Rencanakan arah pergerakan pekerja, hasil panen, kotoran, air limbah, dan kendaraan. Jika suatu rute harus kembali dari zona kotor ke zona bersih, tetapkan prosedur pembersihan dan sanitasi sebelum digunakan kembali.</p></div></li>
+                            </ol>
+                            <div class="process-control"><strong>Yang dicatat:</strong> volume dan mutu air, jam operasi pompa, titik distribusi, serta jalur pergerakan utama. Denah menampilkan lokasi fasilitas, tetapi kapasitas pompa dan jaringan pipa belum dimodelkan.</div>
+                            <button type="button" class="process-map-link" onclick="focusZoneFromProcess(7)">Lihat lokasi Main Gate di peta <span aria-hidden="true">→</span></button>
+                        </div>
+                    </article>
+
+                    <article id="process-step-2" class="process-chapter">
+                        <div class="process-chapter-number">02</div>
+                        <div>
+                            <h3>Budidaya tanaman dan panen</h3>
+                            <span class="process-location">⌖ Lahan Tembakau · Waduk &amp; Rumah Pompa</span>
+                            <p><strong>Lahan tembakau merupakan area budidaya tanaman yang ditampilkan pada denah.</strong> Secara umum, alurnya mencakup persiapan lahan dan bedengan, penanaman, pengelolaan air serta pemeliharaan tanaman, pemantauan kondisi tanaman, lalu panen sesuai kematangan dan prosedur budidaya. Air dan akses ke lahan mendukung kegiatan ini, sementara jadwal dan kebutuhan input harus mengikuti kondisi lahan dan SOP yang dipilih.</p>
+                            <h4 class="process-method-heading">Cara budidaya dari benih hingga panen</h4>
+                            <ol class="process-method">
+                                <li><div><h4>Pilih varietas dan siapkan benih</h4><p>Tentukan jenis tembakau berdasarkan kesesuaian agroklimat, karakter lahan, tujuan pasar, dan metode pengeringan yang tersedia. Gunakan benih bermutu dengan identitas varietas yang jelas; kebutuhan tiap jenis tembakau tidak selalu sama.</p></div></li>
+                                <li><div><h4>Semai dan rawat bibit</h4><p>Benih tembakau berukuran sangat kecil, sehingga umumnya disemai dahulu pada media semai yang bersih dan berdrainase baik, bukan langsung ditebar di lahan produksi. Jaga media tetap lembap tanpa tergenang, berikan cahaya dan sirkulasi udara cukup, lalu pilih bibit yang sehat dan seragam.</p></div></li>
+                                <li><div><h4>Siapkan lahan dan bedengan</h4><p>Periksa kondisi tanah dan drainase, bersihkan gulma, olah tanah sesuai kondisi setempat, lalu bentuk bedengan atau barisan tanam. Atur jarak tanam mengikuti varietas, kesuburan, kebiasaan budidaya lokal, dan ruang yang dibutuhkan untuk perawatan.</p></div></li>
+                                <li><div><h4>Pindahkan bibit ke lahan</h4><p>Setelah bibit cukup kuat dan telah disesuaikan bertahap dengan lingkungan luar, tanam pada kondisi tanah yang cukup lembap. Tangani akar dengan hati-hati, padatkan tanah secukupnya di sekitar tanaman, siram untuk membantu adaptasi, dan ganti bibit yang gagal tumbuh.</p></div></li>
+                                <li><div><h4>Kelola air, hara, dan gulma</h4><p>Pantau kelembapan dan drainase selama pertumbuhan. Susun pemupukan berdasarkan uji tanah dan rekomendasi setempat; dosis serta waktunya tidak boleh disamaratakan tanpa mengetahui tanah dan varietas. Kendalikan gulma agar tidak bersaing dengan tanaman, terutama pada fase awal.</p></div></li>
+                                <li><div><h4>Pantau kesehatan dan bentuk tanaman</h4><p>Amati daun dan batang secara berkala untuk mengenali gejala hama, penyakit, atau kekurangan hara. Utamakan sanitasi kebun dan pengendalian terpadu. Tindakan seperti pemangkasan bunga atau tunas samping hanya dilakukan bila sesuai tipe tembakau dan SOP budidaya yang digunakan.</p></div></li>
+                                <li><div><h4>Panen menurut kematangan dan tipe tembakau</h4><p>Panen saat daun mencapai tingkat kematangan yang ditetapkan untuk varietas dan tujuan mutu. Beberapa tipe dipetik bertahap per tingkat daun, sedangkan metode lain dapat berbeda. Pisahkan daun rusak atau sakit dan jaga daun panen agar tidak tertekan, tercampur tanah, atau terlalu lama menunggu sebelum ditangani.</p></div></li>
+                            </ol>
+                            <div class="process-control"><strong>Yang dicatat:</strong> varietas, tanggal semai dan tanam, luas serta jarak tanam, sumber air, input yang diberikan, gangguan tanaman, tanggal panen, dan berat hasil per petak. Angka jarak, pupuk, dan kalender tanam perlu disesuaikan dengan kondisi lahan dan rekomendasi teknis lokal.</div>
+                            <span class="process-variable">Parameter varietas dan wilayah perlu divalidasi</span>
+                            <span class="process-variable">Belum ada dosis input tetap di denah</span>
+                            <button type="button" class="process-map-link" onclick="focusZoneFromProcess(1)">Lihat area lahan di peta <span aria-hidden="true">→</span></button>
+                        </div>
+                    </article>
+
+                    <article id="process-step-3" class="process-chapter">
+                        <div class="process-chapter-number">03</div>
+                        <div>
+                            <h3>Peternakan ayam dan biosekuriti</h3>
+                            <span class="process-location">⌖ Kandang Ayam Petelur · Lab &amp; Karantina · Unit Maggot BSF</span>
+                            <p><strong>Kelompok kandang ayam petelur ditempatkan terpisah dari zona bersih dan area pascapanen.</strong> Area laboratorium dan karantina mendukung rancangan pemisahan serta pemeriksaan kesehatan ternak. Operasi peternakan perlu mengatur penerimaan ternak, kebersihan personel dan peralatan, pemberian pakan dan air, pemantauan kesehatan, pengumpulan telur, serta penanganan kotoran secara terpisah.</p>
+                            <h4 class="process-method-heading">Rutinitas operasional peternakan</h4>
+                            <ol class="process-method">
+                                <li><div><h4>Siapkan kandang sebelum ternak masuk</h4><p>Kosongkan dan bersihkan kandang sesuai siklus pemeliharaan, periksa tempat pakan, tempat minum, ventilasi, pencahayaan, dan kondisi lantai. Lakukan sanitasi serta pastikan kandang kering dan siap sebelum kelompok ayam ditempatkan.</p></div></li>
+                                <li><div><h4>Terapkan kontrol masuk dan biosekuriti</h4><p>Batasi akses ke area kandang, catat kunjungan, gunakan pakaian dan alas kaki khusus, serta bersihkan peralatan sebelum berpindah kandang. Kendalikan lalu lintas kendaraan, pakan, telur, dan pekerja agar jalur bersih dan kotor tidak saling silang.</p></div></li>
+                                <li><div><h4>Penuhi kebutuhan harian dan pantau kondisi ayam</h4><p>Sediakan pakan dan air minum sesuai fase serta panduan nutrisi ternak. Amati perilaku, nafsu makan, konsumsi air, kondisi lingkungan, dan tanda gangguan kesehatan. Perubahan yang tidak normal dicatat dan ditindaklanjuti bersama petugas atau dokter hewan.</p></div></li>
+                                <li><div><h4>Kumpulkan dan tangani telur</h4><p>Kumpulkan telur secara teratur, pisahkan telur retak atau kotor, dan minimalkan benturan serta kontaminasi. Catat jumlah dan mutu telur, lalu simpan atau kirim menggunakan kondisi penanganan yang ditentukan. Denah belum menunjukkan bangunan khusus sortasi atau penyimpanan telur.</p></div></li>
+                                <li><div><h4>Kelola kotoran dan alas kandang secara terpisah</h4><p>Kumpulkan kotoran dengan metode yang tidak menyebarkan debu atau mencemari saluran air. Timbang atau perkirakan volumenya, simpan sementara dengan pengendalian bau, vektor, dan lindi, lalu kirim ke proses pengolahan setelah jenis bahan dan jalurnya diputuskan.</p></div></li>
+                                <li><div><h4>Catat produksi, kesehatan, dan mortalitas</h4><p>Gunakan catatan per kandang untuk jumlah ayam, telur, pakan, air, kematian, tindakan kesehatan, dan pembersihan. Data ini nantinya menjadi dasar untuk menilai kinerja kandang serta menghitung produksi kotoran dan kebutuhan kapasitas pengolahan.</p></div></li>
+                            </ol>
+                            <div class="process-control"><strong>Yang dicatat:</strong> populasi aktual setiap kandang, umur dan fase ayam, konsumsi pakan-air, jumlah telur, kematian, tindakan kesehatan, serta berat kotoran. Denah hanya menggambarkan sembilan kandang; kapasitasnya belum diketahui.</div>
+                            <span class="process-variable">Keputusan kesehatan mengikuti arahan dokter hewan</span>
+                            <button type="button" class="process-map-link" onclick="focusZoneFromProcess(4)">Lihat zona peternakan di peta <span aria-hidden="true">→</span></button>
+                        </div>
+                    </article>
+
+                    <article id="process-step-4" class="process-chapter">
+                        <div class="process-chapter-number">04</div>
+                        <div>
+                            <h3>Penanganan panen dan pascapanen</h3>
+                            <span class="process-location">⌖ Bangsal Panen &amp; Sortasi · Barn Pengering · Gedung Grading</span>
+                            <p><strong>Hasil panen tanaman bergerak dari area budidaya menuju fasilitas penanganan hasil.</strong> Bangsal panen dan sortasi menjadi titik penerimaan serta pemilahan awal. Hasil yang memenuhi kriteria proses diteruskan ke barn pengering, lalu ke gedung grading dan penimbangan sebelum disimpan atau dikirim sesuai spesifikasi mutu dan kebutuhan pasar.</p>
+                            <h4 class="process-method-heading">Urutan penanganan hasil tembakau</h4>
+                            <ol class="process-method">
+                                <li><div><h4>Terima dan identifikasi hasil</h4><p>Catat asal petak, varietas, tanggal panen, dan kelompok hasil sebagai satu lot. Pisahkan lot yang berbeda agar mutu dan riwayat prosesnya tetap dapat ditelusuri.</p></div></li>
+                                <li><div><h4>Sortasi awal dan susun proses</h4><p>Buang atau pisahkan daun yang rusak, tercampur tanah, atau tidak memenuhi kriteria. Susun hasil berdasarkan tingkat kematangan dan karakter yang sesuai dengan metode pengeringan; hindari penumpukan yang menahan panas atau kelembapan.</p></div></li>
+                                <li><div><h4>Keringkan atau curing sesuai tipe</h4><p>Masukkan bahan ke barn dan atur sirkulasi udara serta kondisi pengeringan mengikuti jenis tembakau dan spesifikasi barn. Pengeringan adalah tahap yang sensitif terhadap suhu, kelembapan, aliran udara, dan susunan daun. Denah belum menentukan apakah sistemnya memakai curing tertentu, sehingga profil operasi tidak boleh diasumsikan.</p></div></li>
+                                <li><div><h4>Kondisikan dan grading</h4><p>Setelah proses pengeringan, kondisikan hasil agar penanganan berikutnya tidak merusak daun. Lakukan grading menurut kriteria ukuran, warna, kondisi, dan mutu yang dipakai oleh pembeli atau standar komoditas; catat hasil tiap kelas.</p></div></li>
+                                <li><div><h4>Timbang, simpan, dan siapkan pengiriman</h4><p>Timbang hasil per lot dan kelas, gunakan kemasan serta penyimpanan yang melindungi produk dari kelembapan dan kontaminasi, kemudian susun pengiriman berdasarkan urutan dan persyaratan pasar.</p></div></li>
+                            </ol>
+                            <div class="process-control"><strong>Yang dicatat:</strong> berat masuk dan keluar, waktu tunggu, kondisi proses barn, kehilangan hasil, kelas mutu, dan konsumsi energi. Model menunjukkan dua barn pengering, tetapi kapasitas dan profil curing-nya perlu ditetapkan.</div>
+                            <span class="process-variable">Metode curing bergantung pada tipe tembakau dan spesifikasi barn</span>
+                            <button type="button" class="process-map-link" onclick="focusZoneFromProcess(3)">Lihat zona pascapanen di peta <span aria-hidden="true">→</span></button>
+                        </div>
+                    </article>
+
+                    <article id="process-step-5" class="process-chapter">
+                        <div class="process-chapter-number">05</div>
+                        <div>
+                            <h3>Pengelolaan kotoran, kompos, BSF, dan limbah</h3>
+                            <span class="process-location">⌖ Area Kandang &amp; BSF · Rumah Kompos · IPAL · TPS Limbah B3</span>
+                            <p><strong>Hasil samping perlu dipilah berdasarkan karakteristik dan risikonya.</strong> Kotoran ayam dapat ditimbang dan dianalisis untuk menentukan pilihan penanganan yang aman, misalnya pengomposan atau jalur BSF apabila sesuai hasil kajian. Bahan yang telah diproses dan memenuhi uji mutu berpotensi dimanfaatkan kembali di lahan. Air limbah diarahkan ke sistem IPAL, sementara limbah B3 harus ditangani melalui jalur terpisah sesuai ketentuan.</p>
+                            <h4 class="process-method-heading">Pilah dahulu, lalu pilih jalur pengolahan</h4>
+                            <ol class="process-method">
+                                <li><div><h4>Kumpulkan dan karakterisasi bahan organik</h4><p>Timbang kotoran ayam dan bahan alas secara terpisah bila memungkinkan. Catat kadar air, kontaminan, waktu penyimpanan, dan sumber kandang. Data ini menentukan apakah bahan dapat diproses bersama atau memerlukan penanganan awal.</p></div></li>
+                                <li><div><h4>Tentukan jalur kompos atau BSF berdasarkan kelayakan</h4><p>Untuk kompos, susun campuran dengan bahan pengaya karbon atau bahan pembentuk struktur bila diperlukan, lalu kendalikan kelembapan, aerasi, dan pembalikan berdasarkan metode yang dipilih. Untuk BSF, gunakan hanya bahan yang sesuai dengan kebutuhan budidaya larva dan persyaratan biosekuriti. Kotoran ayam tidak otomatis cocok untuk semua sistem BSF.</p></div></li>
+                                <li><div><h4>Pantau proses dan lakukan pematangan</h4><p>Catat perubahan suhu, kelembapan, bau, dan kondisi bahan selama proses. Kompos perlu mencapai kondisi matang dan stabil sebelum digunakan; waktu proses bergantung pada komposisi, ukuran tumpukan, cuaca, dan cara pengelolaan.</p></div></li>
+                                <li><div><h4>Periksa mutu sebelum dimanfaatkan</h4><p>Uji mutu sesuai tujuan dan ketentuan yang berlaku, termasuk parameter kematangan, kandungan hara, dan aspek keamanan yang relevan. Hasil yang lolos dapat dipertimbangkan sebagai pembenah atau sumber hara lahan berdasarkan kebutuhan tanaman, bukan diberikan dengan dosis yang sama untuk semua petak.</p></div></li>
+                                <li><div><h4>Kelola air limbah dan limbah B3 pada jalurnya</h4><p>Air limbah diarahkan ke unit IPAL sesuai karakteristiknya. Limbah B3 dipilah, disimpan, dan diserahkan melalui prosedur yang berlaku. Keduanya tidak dicampurkan ke tumpukan kompos atau bahan BSF.</p></div></li>
+                            </ol>
+                            <div class="process-control"><strong>Yang dicatat:</strong> berat bahan masuk, kadar air, bahan campuran, metode dan lama proses, hasil akhir, hasil uji mutu, serta tujuan pemanfaatan. Resep, kapasitas, dan kebutuhan lahan aplikasi akan dihitung pada tahap berikutnya dengan data dan sumber yang dapat ditelusuri.</div>
+                            <span class="process-variable">Kelayakan kompos dan BSF perlu diuji, bukan diasumsikan</span>
+                            <button type="button" class="process-map-link" onclick="focusZoneFromProcess(5)">Lihat zona pengelolaan limbah di peta <span aria-hidden="true">→</span></button>
+                        </div>
+                    </article>
+
+                    <article id="process-step-6" class="process-chapter">
+                        <div class="process-chapter-number">06</div>
+                        <div>
+                            <h3>Mesin, logistik, dan perawatan fasilitas</h3>
+                            <span class="process-location">⌖ Bengkel Alsintan · Gudang Suku Cadang · Jalan Kawasan</span>
+                            <p><strong>Bengkel dan gudang suku cadang mendukung kesinambungan semua tahap.</strong> Kebutuhan mesin ditentukan dari pekerjaan yang harus diselesaikan, bukan hanya dari luas total kawasan. Analisis berikutnya akan menghubungkan luas dan kondisi petak, kalender kegiatan, kapasitas kerja alat, jam operasi efektif, jarak angkut, ketersediaan operator, serta waktu perawatan untuk memperkirakan jenis dan jumlah unit.</p>
+                            <h4 class="process-method-heading">Cara menentukan mesin dan jumlah unit</h4>
+                            <ol class="process-method">
+                                <li><div><h4>Daftarkan pekerjaan dan kalendernya</h4><p>Uraikan pekerjaan per komoditas: pengolahan lahan, pembentukan bedengan, pemindahan bibit, pemeliharaan antarbaris, pemanenan, pengangkutan, pengeringan, serta penanganan kompos. Catat luas, jarak, dan rentang waktu yang tersedia untuk setiap pekerjaan.</p></div></li>
+                                <li><div><h4>Pilih kelas mesin sesuai tugas</h4><p>Susun kandidat berdasarkan fungsi, misalnya alat pengolah tanah dan pembentuk bedengan, pompa, alat angkut panen, peralatan barn, atau alat pembalik dan pemindah kompos. Periksa kesesuaian kapasitas, sumber tenaga, lebar kerja, kondisi tanah, dan akses jalan sebelum memilih model tertentu.</p></div></li>
+                                <li><div><h4>Hitung kapasitas kerja efektif</h4><p>Gunakan luas atau volume pekerjaan dibagi kapasitas kerja lapangan yang realistis. Kurangi kapasitas teoritis dengan waktu untuk berbelok, mengisi bahan bakar, pemindahan, istirahat, cuaca, dan gangguan teknis agar target tidak hanya terlihat cukup di atas kertas.</p></div></li>
+                                <li><div><h4>Tentukan jumlah unit dari beban puncak</h4><p>Bandingkan total beban kerja dengan jam kerja efektif yang tersedia pada periode paling sibuk. Jumlah unit harus cukup untuk menyelesaikan pekerjaan tepat waktu setelah memperhitungkan ketersediaan alat dan kebutuhan cadangan; perhitungannya memerlukan data luas, jadwal, dan spesifikasi mesin.</p></div></li>
+                                <li><div><h4>Rencanakan operator, perawatan, dan biaya</h4><p>Pastikan jumlah operator, ketersediaan suku cadang, tempat servis, dan jadwal pemeliharaan sejalan dengan rencana kerja. Bandingkan pembelian, penyewaan, dan penggunaan jasa berdasarkan biaya investasi, operasi, risiko waktu henti, serta intensitas pemakaian.</p></div></li>
+                            </ol>
+                            <div class="process-control"><strong>Data untuk perhitungan:</strong> luas efektif per petak, kalender kegiatan, kapasitas aktual kandidat mesin, jam operasi per hari, kondisi dan jarak jalan, jumlah operator, waktu servis, serta batas anggaran. Denah saat ini belum memberi angka-angka tersebut.</div>
+                            <span class="process-variable">Jumlah mesin belum bisa ditetapkan hanya dari gambar tata letak</span>
+                            <button type="button" class="process-map-link" onclick="focusZoneFromProcess(6)">Lihat zona bengkel di peta <span aria-hidden="true">→</span></button>
+                        </div>
+                    </article>
+                </div>
+
+                <aside class="process-note">
+                    <strong>Catatan untuk presentasi dan analisis lanjutan:</strong> visual ini menjelaskan tata letak dan alur proses yang direncanakan; bukan pembacaan sensor atau laporan produksi aktual. Langkah budidaya di atas adalah penjelasan umum, bukan rekomendasi dosis atau kalender tanam khusus untuk varietas dan lokasi tertentu. Denah saat ini belum memuat kapasitas kandang, luas efektif tiap komoditas, debit air, hasil panen, volume limbah, maupun spesifikasi mesin. Perhitungan kompos dan jumlah mesin akan memerlukan data tersebut, rumus yang transparan, serta rujukan jurnal atau standar teknis yang dapat ditelusuri.
+                </aside>
+            </div>
+        </section>
     </div>
 
     <!-- Application Script -->
     <script>
         let isSidebarOpen = false;
+        let isProcessModalOpen = false;
+        let processReturnFocus = null;
         let targetCamPos = null;
         let targetLookAt = null;
 
@@ -102,17 +936,112 @@
             targetLookAt = new THREE.Vector3(tx, ty, tz);
         }
 
+        function selectZone(button, cx, cy, cz, tx, ty, tz) {
+            document.querySelectorAll('.zone-button').forEach((zoneButton) => {
+                const isActive = zoneButton === button;
+                zoneButton.classList.toggle('is-active', isActive);
+                zoneButton.setAttribute('aria-pressed', String(isActive));
+            });
+            flyTo(cx, cy, cz, tx, ty, tz);
+        }
+
         function toggleSidebar() {
             isSidebarOpen = !isSidebarOpen;
             const sidebar = document.getElementById('parameter-sidebar');
+            const menuToggle = document.getElementById('menu-toggle');
             if (isSidebarOpen) {
-                sidebar.classList.remove('-translate-x-[120%]', 'opacity-0');
-                sidebar.classList.add('translate-x-0', 'opacity-100');
+                sidebar.classList.remove('is-closed');
+                sidebar.classList.add('is-open');
+                sidebar.setAttribute('aria-hidden', 'false');
+                sidebar.inert = false;
+                menuToggle.setAttribute('aria-expanded', 'true');
             } else {
-                sidebar.classList.remove('translate-x-0', 'opacity-100');
-                sidebar.classList.add('-translate-x-[120%]', 'opacity-0');
+                sidebar.classList.remove('is-open');
+                sidebar.classList.add('is-closed');
+                sidebar.setAttribute('aria-hidden', 'true');
+                sidebar.inert = true;
+                menuToggle.setAttribute('aria-expanded', 'false');
             }
         }
+
+        function openProcessModal() {
+            if (isProcessModalOpen) return;
+
+            const backdrop = document.getElementById('process-backdrop');
+            const modal = document.getElementById('process-modal');
+            processReturnFocus = document.activeElement;
+            isProcessModalOpen = true;
+            document.querySelector('.map-overlay').inert = true;
+            modal.inert = false;
+            backdrop.classList.add('is-visible');
+            backdrop.setAttribute('aria-hidden', 'false');
+            document.getElementById('process-close').focus();
+            document.addEventListener('keydown', handleProcessModalKeydown);
+        }
+
+        function closeProcessModal() {
+            if (!isProcessModalOpen) return;
+
+            const backdrop = document.getElementById('process-backdrop');
+            const modal = document.getElementById('process-modal');
+            isProcessModalOpen = false;
+            backdrop.classList.remove('is-visible');
+            backdrop.setAttribute('aria-hidden', 'true');
+            modal.inert = true;
+            document.querySelector('.map-overlay').inert = false;
+            document.removeEventListener('keydown', handleProcessModalKeydown);
+
+            if (processReturnFocus && processReturnFocus.isConnected) {
+                processReturnFocus.focus();
+            }
+            processReturnFocus = null;
+        }
+
+        function handleProcessModalKeydown(event) {
+            if (event.key === 'Escape') {
+                closeProcessModal();
+                return;
+            }
+
+            if (event.key !== 'Tab') return;
+
+            const modal = document.getElementById('process-modal');
+            const focusableElements = modal.querySelectorAll('button:not([disabled])');
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+
+            if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement.focus();
+            } else if (!event.shiftKey && document.activeElement === lastElement) {
+                event.preventDefault();
+                firstElement.focus();
+            }
+        }
+
+        function focusProcessSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        }
+
+        function focusZoneFromProcess(zoneIndex) {
+            const zoneButtons = document.querySelectorAll('.zone-button');
+            const zoneButton = zoneButtons[zoneIndex];
+            if (!zoneButton) {
+                throw new Error(`Tombol zona dengan indeks ${zoneIndex} tidak ditemukan.`);
+            }
+
+            closeProcessModal();
+            zoneButton.click();
+            zoneButton.focus();
+        }
+
+        document.getElementById('process-backdrop').addEventListener('click', (event) => {
+            if (event.target === event.currentTarget) {
+                closeProcessModal();
+            }
+        });
 
         // --- THREE.JS SETUP ---
         const container = document.getElementById('canvas-container');
